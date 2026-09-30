@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste de Câmera #015</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <main class="container">
+
+    <h1>📷 Teste de Câmera #015</h1>
+
+    <p class="subtitulo">
+      Laboratório de acesso à câmera pelo navegador
+    </p>
+
+    <section class="status-box">
+      <strong>Status:</strong>
+      <span id="status">Câmera desligada</span>
+    </section>
+
+    <section class="camera-area">
+
+      <video id="video" autoplay playsinline muted></video>
+
+      <div id="camera-placeholder">
+        📷<br>
+        Câmera ainda não iniciada
+      </div>
+
+    </section>
+
+    <section class="botoes">
+
+      <button id="btnIniciar">
+        📷 Iniciar câmera
+      </button>
+
+      <button id="btnTrocar" disabled>
+        🔄 Trocar câmera
+      </button>
+
+      <button id="btnFoto" disabled>
+        📸 Tirar foto
+      </button>
+
+      <button id="btnParar" disabled>
+        ⛔ Parar câmera
+      </button>
+
+    </section>
+
+    <section class="resultado">
+
+      <h2>📸 Foto capturada</h2>
+
+      <canvas id="canvas"></canvas>
+
+      <div class="acoes-foto">
+
+        <button id="btnBaixar" disabled>
+          ⬇️ Baixar foto
+        </button>
+
+        <button id="btnApagar" disabled>
+          🗑️ Apagar foto
+        </button>
+
+      </div>
+
+    </section>
+
+    <section class="informacoes">
+
+      <h2>🔬 Informações</h2>
+
+      <p>
+        <strong>Câmera atual:</strong>
+        <span id="cameraAtual">Nenhuma</span>
+      </p>
+
+      <p>
+        <strong>Câmeras encontradas:</strong>
+        <span id="quantidadeCameras">0</span>
+      </p>
+
+      <p>
+        <strong>Permissão:</strong>
+        <span id="permissao">Ainda não solicitada</span>
+      </p>
+
+      <p>
+        <strong>Resolução:</strong>
+        <span id="resolucao">Nenhuma</span>
+      </p>
+
+      <p>
+        <strong>Orientação:</strong>
+        <span id="orientacao">Desconhecida</span>
+      </p>
+
+    </section>
+
+    <section class="testes">
+
+      <h2>🧪 Testes do laboratório</h2>
+
+      <div id="resultadoTestes">
+
+        <p>⚪ Câmera ainda não testada.</p>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="script.js"></script>
+
+</body>
+        </html>
