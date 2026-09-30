@@ -25,7 +25,6 @@ let ultimaFoto = null;
 
 function atualizarStatus(texto, tipo = "") {
   statusTexto.textContent = texto;
-
   statusTexto.className = tipo;
 }
 
@@ -85,7 +84,8 @@ async function listarCameras() {
   }
 
   try {
-    const dispositivos = await navigator.mediaDevices.enumerateDevices();
+    const dispositivos =
+      await navigator.mediaDevices.enumerateDevices();
 
     cameras = dispositivos.filter(function(dispositivo) {
       return dispositivo.kind === "videoinput";
@@ -99,6 +99,61 @@ async function listarCameras() {
 
   } catch (erro) {
     quantidadeCameras.textContent = "Erro";
+  }
+}
+
+function obterNomeCamera(faixa) {
+  const configuracao = faixa.getSettings();
+
+  if (configuracao.facingMode === "environment") {
+    return "Câmera traseira";
+  }
+
+  if (configuracao.facingMode === "user") {
+    return "Câmera frontal";
+  }
+
+  if (configuracao.deviceId) {
+
+    const encontrada = cameras.find(function(camera) {
+      return camera.deviceId === configuracao.deviceId;
+    });
+
+    if (encontrada && encontrada.label) {
+      return encontrada.label;
+    }
+  }
+
+  if (cameras[indiceCamera] && cameras[indiceCamera].label) {
+    return cameras[indiceCamera].label;
+  }
+
+  return "Câmera " + (indiceCamera + 1);
+}
+
+function atualizarInformacoesCamera() {
+  if (!streamAtual) {
+    return;
+  }
+
+  const faixas = streamAtual.getVideoTracks();
+
+  if (faixas.length === 0) {
+    return;
+  }
+
+  const faixa = faixas[0];
+  const configuracao = faixa.getSettings();
+
+  cameraAtual.textContent = obterNomeCamera(faixa);
+
+  if (configuracao.width && configuracao.height) {
+    resolucao.textContent =
+      configuracao.width +
+      " × " +
+      configuracao.height;
+  } else {
+    resolucao.textContent = "Desconhecida";
   }
 }
 
@@ -131,7 +186,10 @@ function pararCamera() {
 
 async function iniciarCamera(indice = 0) {
 
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  if (
+    !navigator.mediaDevices ||
+    !navigator.mediaDevices.getUserMedia
+  ) {
 
     atualizarStatus(
       "Este navegador não oferece acesso à câmera",
@@ -152,44 +210,48 @@ async function iniciarCamera(indice = 0) {
 
   try {
 
-    await listarCameras();
+    limparTestes();
 
-    if (cameras.length === 0) {
+    adicionarTeste(
+      "🟡 Solicitando acesso à câmera...",
+      "aviso"
+    );
 
-      atualizarStatus(
-        "Nenhuma câmera encontrada",
-        "erro"
+    /*
+      PRIMEIRA TENTATIVA:
+
+      Não usamos deviceId.
+      Não exigimos resolução específica.
+      Não exigimos câmera frontal ou traseira.
+
+      Isso evita OverconstrainedError em aparelhos
+      que não aceitam determinadas configurações.
+    */
+
+    streamAtual =
+      await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+
+    const faixas =
+      streamAtual.getVideoTracks();
+
+    if (faixas.length === 0) {
+
+      throw new Error(
+        "Nenhuma faixa de vídeo foi criada."
       );
-
-      adicionarTeste(
-        "❌ Nenhuma câmera de vídeo foi encontrada.",
-        "erro"
-      );
-
-      return;
     }
 
-    indiceCamera = indice % cameras.length;
+    const faixa = faixas[0];
 
-    const cameraEscolhida = cameras[indiceCamera];
+    const configuracao =
+      faixa.getSettings();
 
-    const constraints = {
-      video: {
-        deviceId: {
-          exact: cameraEscolhida.deviceId
-        },
-        width: {
-          ideal: 1920
-        },
-        height: {
-          ideal: 1080
-        }
-      },
-      audio: false
-    };
-
-    streamAtual = await navigator.mediaDevices.getUserMedia(
-      constraints
+    console.log(
+      "Configuração da câmera:",
+      configuracao
     );
 
     video.srcObject = streamAtual;
@@ -199,26 +261,22 @@ async function iniciarCamera(indice = 0) {
 
     await video.play();
 
-    const faixa = streamAtual.getVideoTracks()[0];
+    /*
+      Agora que a permissão foi concedida,
+      podemos listar novamente as câmeras.
+    */
 
-    const configuracao = faixa.getSettings();
+    await listarCameras();
 
-    let nomeCamera = cameraEscolhida.label;
-
-    if (!nomeCamera) {
-      nomeCamera = "Câmera " + (indiceCamera + 1);
+    if (cameras.length > 0) {
+      indiceCamera =
+        Math.min(
+          indice,
+          cameras.length - 1
+        );
     }
 
-    cameraAtual.textContent = nomeCamera;
-
-    if (configuracao.width && configuracao.height) {
-      resolucao.textContent =
-        configuracao.width +
-        " × " +
-        configuracao.height;
-    } else {
-      resolucao.textContent = "Desconhecida";
-    }
+    atualizarInformacoesCamera();
 
     atualizarStatus(
       "Câmera funcionando",
@@ -231,8 +289,6 @@ async function iniciarCamera(indice = 0) {
     btnTrocar.disabled = cameras.length < 2;
     btnFoto.disabled = false;
     btnParar.disabled = false;
-
-    limparTestes();
 
     adicionarTeste(
       "✅ getUserMedia funcionando.",
@@ -250,27 +306,65 @@ async function iniciarCamera(indice = 0) {
     );
 
     adicionarTeste(
-      "✅ Configurações da câmera detectadas.",
+      "✅ Configurações reais da câmera detectadas.",
       "sucesso"
     );
 
+    if (
+      configuracao.width &&
+      configuracao.height
+    ) {
+
+      adicionarTeste(
+        "📐 Resolução detectada: " +
+        configuracao.width +
+        " × " +
+        configuracao.height,
+        "sucesso"
+      );
+    }
+
     if (cameras.length >= 2) {
+
       adicionarTeste(
         "✅ Mais de uma câmera disponível.",
         "sucesso"
       );
+
     } else {
+
       adicionarTeste(
-        "⚠️ Apenas uma câmera disponível.",
+        "⚠️ O navegador informou apenas uma câmera.",
         "aviso"
       );
     }
 
-    await listarCameras();
-
   } catch (erro) {
 
-    console.error(erro);
+    console.error(
+      "Erro completo da câmera:",
+      erro
+    );
+
+    if (streamAtual) {
+
+      streamAtual.getTracks().forEach(
+        function(track) {
+          track.stop();
+        }
+      );
+
+      streamAtual = null;
+    }
+
+    video.srcObject = null;
+    video.style.display = "none";
+    placeholder.style.display = "flex";
+
+    btnIniciar.disabled = false;
+    btnTrocar.disabled = true;
+    btnFoto.disabled = true;
+    btnParar.disabled = true;
 
     if (erro.name === "NotAllowedError") {
 
@@ -310,6 +404,23 @@ async function iniciarCamera(indice = 0) {
         "erro"
       );
 
+    } else if (erro.name === "OverconstrainedError") {
+
+      atualizarStatus(
+        "Configuração de câmera não suportada",
+        "erro"
+      );
+
+      adicionarTeste(
+        "❌ O navegador recusou uma configuração da câmera.",
+        "erro"
+      );
+
+      adicionarTeste(
+        "🔬 OverconstrainedError detectado.",
+        "erro"
+      );
+
     } else if (erro.name === "SecurityError") {
 
       atualizarStatus(
@@ -330,25 +441,186 @@ async function iniciarCamera(indice = 0) {
       );
 
       adicionarTeste(
-        "❌ Erro: " + erro.name,
+        "❌ Erro: " +
+        erro.name,
         "erro"
       );
+
+      if (erro.message) {
+
+        adicionarTeste(
+          "ℹ️ " +
+          erro.message,
+          "aviso"
+        );
+      }
     }
 
     verificarPermissao();
   }
 }
 
-function trocarCamera() {
+async function trocarCamera() {
 
   if (cameras.length < 2) {
     return;
   }
 
   const proxima =
-    (indiceCamera + 1) % cameras.length;
+    (indiceCamera + 1) %
+    cameras.length;
 
-  iniciarCamera(proxima);
+  /*
+    Para evitar problemas de deviceId,
+    tentamos primeiro usar a câmera pelo
+    deviceId somente depois que já temos
+    permissão.
+  */
+
+  if (cameras[proxima]) {
+
+    const cameraEscolhida =
+      cameras[proxima];
+
+    if (streamAtual) {
+
+      streamAtual.getTracks().forEach(
+        function(track) {
+          track.stop();
+        }
+      );
+
+      streamAtual = null;
+    }
+
+    try {
+
+      const novoStream =
+        await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: {
+              exact: cameraEscolhida.deviceId
+            }
+          },
+          audio: false
+        });
+
+      streamAtual = novoStream;
+
+      indiceCamera = proxima;
+
+      video.srcObject = streamAtual;
+
+      video.style.display = "block";
+      placeholder.style.display = "none";
+
+      await video.play();
+
+      atualizarInformacoesCamera();
+
+      atualizarStatus(
+        "Câmera trocada",
+        "sucesso"
+      );
+
+      adicionarTeste(
+        "🔄 Câmera trocada com sucesso.",
+        "sucesso"
+      );
+
+      return;
+
+    } catch (erro) {
+
+      console.warn(
+        "Não foi possível selecionar diretamente a câmera:",
+        erro
+      );
+
+      /*
+        Se o deviceId não funcionar,
+        tentamos uma alternativa usando
+        facingMode.
+      */
+
+      try {
+
+        const configuracaoAtual =
+          streamAtual &&
+          streamAtual.getVideoTracks().length
+            ? streamAtual
+                .getVideoTracks()[0]
+                .getSettings()
+            : {};
+
+        let modo;
+
+        if (
+          configuracaoAtual.facingMode === "user"
+        ) {
+          modo = "environment";
+        } else {
+          modo = "user";
+        }
+
+        if (streamAtual) {
+
+          streamAtual.getTracks().forEach(
+            function(track) {
+              track.stop();
+            }
+          );
+
+          streamAtual = null;
+        }
+
+        streamAtual =
+          await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: {
+                ideal: modo
+              }
+            },
+            audio: false
+          });
+
+        video.srcObject = streamAtual;
+
+        video.style.display = "block";
+        placeholder.style.display = "none";
+
+        await video.play();
+
+        atualizarInformacoesCamera();
+
+        atualizarStatus(
+          "Câmera trocada",
+          "sucesso"
+        );
+
+        adicionarTeste(
+          "🔄 Troca alternativa de câmera realizada.",
+          "sucesso"
+        );
+
+      } catch (erroAlternativo) {
+
+        atualizarStatus(
+          "Não foi possível trocar a câmera",
+          "erro"
+        );
+
+        adicionarTeste(
+          "❌ A troca de câmera não foi aceita pelo dispositivo.",
+          "erro"
+        );
+
+        console.error(
+          erroAlternativo
+        );
+      }
+    }
+  }
 }
 
 function tirarFoto() {
@@ -357,7 +629,11 @@ function tirarFoto() {
     return;
   }
 
-  if (!video.videoWidth || !video.videoHeight) {
+  if (
+    !video.videoWidth ||
+    !video.videoHeight
+  ) {
+
     adicionarTeste(
       "❌ O vídeo ainda não está pronto.",
       "erro"
@@ -366,10 +642,14 @@ function tirarFoto() {
     return;
   }
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+  canvas.width =
+    video.videoWidth;
 
-  const contexto = canvas.getContext("2d");
+  canvas.height =
+    video.videoHeight;
+
+  const contexto =
+    canvas.getContext("2d");
 
   contexto.drawImage(
     video,
@@ -379,10 +659,11 @@ function tirarFoto() {
     canvas.height
   );
 
-  ultimaFoto = canvas.toDataURL(
-    "image/jpeg",
-    0.92
-  );
+  ultimaFoto =
+    canvas.toDataURL(
+      "image/jpeg",
+      0.92
+    );
 
   canvas.style.display = "block";
 
@@ -401,10 +682,13 @@ function baixarFoto() {
     return;
   }
 
-  const link = document.createElement("a");
+  const link =
+    document.createElement("a");
 
   link.href = ultimaFoto;
-  link.download = "foto-camera-015.jpg";
+
+  link.download =
+    "foto-camera-015.jpg";
 
   document.body.appendChild(link);
 
@@ -422,7 +706,8 @@ function apagarFoto() {
 
   ultimaFoto = null;
 
-  const contexto = canvas.getContext("2d");
+  const contexto =
+    canvas.getContext("2d");
 
   contexto.clearRect(
     0,
@@ -445,7 +730,7 @@ function apagarFoto() {
 btnIniciar.addEventListener(
   "click",
   function() {
-    iniciarCamera(indiceCamera);
+    iniciarCamera(0);
   }
 );
 
@@ -575,7 +860,6 @@ async function iniciarLaboratorio() {
     "🟢 O navegador pode solicitar acesso à câmera.",
     "sucesso"
   );
-
 }
 
 iniciarLaboratorio();
